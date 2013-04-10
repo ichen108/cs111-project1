@@ -43,6 +43,8 @@ struct command_stream
 
 /* Function declarations. */
 int getGrammar(int c);
+void free_memory(char* array, command_stream_t s);
+command_t parse(command_stream_t s, int start, int end, int *line, int *ferror);
 
 command_stream_t
 make_command_stream (int (*get_next_byte) (void *),
@@ -62,16 +64,16 @@ make_command_stream (int (*get_next_byte) (void *),
   
   int curr = 0;
   int line = 0;
+  int ferror = 0;
+  int parentheses = 0;
   
   char prevChar = '\0';
   char prevprevChar = '\0';
 
-  bool pipeline = false;
   bool stop = false;
+  bool pipeline = false;
 
-  int parentheses = 0;
-
-  /* Read stream into array. */
+  /* For loop reads stream and checks for syntax error. */
   for(curr = get_next_byte(get_next_byte_argument); curr != EOF; )
   {
     char* arrayOfTokens;
@@ -95,7 +97,11 @@ make_command_stream (int (*get_next_byte) (void *),
           curr = get_next_byte(get_next_byte_argument);
         }
       }
-      else error(1, 0, "%i: Syntax Error - Not a valid comment.", line);
+      else
+      {
+         free_memory(arrayOfTokens, curr_stream);
+         error(1, 0, "%i: Syntax Error - Not a valid comment.", line);
+      }
     }
 
     /* Start storing if there is something to store from stream. */
@@ -115,7 +121,7 @@ make_command_stream (int (*get_next_byte) (void *),
         case '&':
           if(prevprevChar == ';' || prevprevChar == '\n' || prevprevChar == '\0')
           {
-            free(arrayOfTokens);
+            free_memory(arrayOfTokens, curr_stream);
             error(1, 0, "%i: Syntax Error - Misusage of ; or | or || or &&.", line);
           }
           break;
@@ -129,14 +135,14 @@ make_command_stream (int (*get_next_byte) (void *),
         case '>':
           if(prevChar == '<' || prevChar == '>' || prevChar == '\0')
           {  
-            free(arrayOfTokens);
+            free_memory(arrayOfTokens, curr_stream);
             error(1, 0, "%i: Syntax Error - Misusage of > or <.", line);
           }
           break;
         case '\n':
           if(prevChar == '<' || prevChar == '>')
           {
-            free(arrayOfTokens);
+            free_memory(arrayOfTokens, curr_stream);
             error(1, 0, "%i: Syntax Error - Misusage of > or <.", line);
           }
           if(getGrammar(prevChar) == WORD || prevChar == ')')
@@ -165,7 +171,7 @@ make_command_stream (int (*get_next_byte) (void *),
         case '&':
           if(curr != '&')
           {
-            free(arrayOfTokens);
+            free_memory(arrayOfTokens, curr_stream);
             error(1, 0, "%i: Syntax Error: Missing &", line);
           }
           break;
@@ -174,7 +180,7 @@ make_command_stream (int (*get_next_byte) (void *),
       else if(getGrammar(curr) == OTHER)
       {
         /* Syntax not used in this shell. */
-        free(arrayOfTokens);
+        free_memory(arrayOfTokens, curr_stream);
         error(1, 0, "%i: Syntax Error- Not WORD OR TOKEN OR SPACE", line);
       }
       else
@@ -215,12 +221,18 @@ make_command_stream (int (*get_next_byte) (void *),
         free(arrayOfTokens);
       }
     }
-  }
-  
+  } 
+
+  /* Reports parentheses matching error. */
   if(parentheses != 0)
   {
     error(1, 0, "0: Syntax Error - Unmatched parentheses.");
   }
+
+  line++;
+
+  curr_stream->script = parse(curr_stream, 0, curr_stream->num_token - 1, &line, &ferror);
+  curr_stream->container = checked_malloc(sizeof(command_t*));
   return curr_stream;
 }
 
@@ -229,6 +241,8 @@ read_command_stream (command_stream_t s)
 {
   /* FIXME: Replace this with your implementation too.  */
   //error (1, 0, "command reading not yet implemented");
+  
+  /* Temporary addition to remove warning. */
   printf("%i", s->position);
   return 0;
 }
@@ -247,4 +261,55 @@ int getGrammar(int c)
     return -1;
   else 
     return OTHER;
+}
+
+/* Frees array containing token and command_stream. */
+void free_memory(char* array, command_stream_t s)
+{
+  /* Free c-string. */
+  free(array);
+ 
+ /* Checks if there is something to remove in command_stream. */
+  if(s == NULL)
+  {
+    error(1, 0, "0: Memory Error - Cannot free NULL");
+  }
+
+  /* Free each token in array. */
+  size_t start = 0;
+  while(start < s->num_token)
+  {
+    free(s->str_token[start]);
+    start++;
+  }
+
+  /* Free pointer to this memory. */
+  free(s->str_token);
+ 
+  /* Checks if there is something of command_t and removes it. */
+  if(s->container != NULL)
+  {
+    free(s->container);
+  }
+
+  /* Completely free command_stream. */
+  free(s);
+}
+
+command_t parse(command_stream_t s, int start, int end, int *line, int *ferror)
+{
+  /* Initalization of return command. */
+  command_t ret_command;
+  ret_command = checked_malloc(sizeof(struct command));
+  ret_command->type = -1;
+  ret_command->status = -1;
+  ret_command->input = 0;
+  ret_command->output = 0;
+
+  int pos = end;
+
+  while(end > start && ((strcmp(s->str_token[end], "\n")) == 0 || strcmp(s->str_token[end], ";") == 0))
+  {
+      end--;
+  }
 }
