@@ -36,6 +36,7 @@ struct command_stream
 {
   int position;
   char** str_token;
+  size_t num_token;
   command_t* container;
   command_t script;
 };
@@ -56,20 +57,25 @@ make_command_stream (int (*get_next_byte) (void *),
   command_stream_t curr_stream = checked_malloc(sizeof(struct command_stream));
   curr_stream->position = 0;
   curr_stream->str_token = checked_malloc(sizeof(char*));
+  curr_stream->num_token = 0;
   curr_stream->script = NULL;
   
   int curr = 0;
   int line = 0;
   
   char prevChar = '\0';
-  char prevToken = '\0';
+  char prevprevChar = '\0';
 
   bool pipeline = false;
+  bool stop = false;
+
+  int parentheses = 0;
 
   /* Read stream into array. */
   for(curr = get_next_byte(get_next_byte_argument); curr != EOF; )
   {
     char* arrayOfTokens;
+    size_t char_size = sizeof(char);
 
     /* Checks for leading spaces and removes them from stream. */
     while(getGrammar(curr) == SPACE)
@@ -89,77 +95,133 @@ make_command_stream (int (*get_next_byte) (void *),
           curr = get_next_byte(get_next_byte_argument);
         }
       }
-      else error(1, 0, "%u: Syntax Error - Not a valid comment.", line);
+      else error(1, 0, "%i: Syntax Error - Not a valid comment.", line);
     }
 
     /* Start storing if there is something to store from stream. */
     if(curr != EOF)
     {
-      arrayOfTokens = checked_malloc((sizeof(char) * 2));
+      arrayOfTokens = checked_malloc(char_size * 2);
      
       if(getGrammar(curr) == TOKEN)
       {
         arrayOfTokens[0] = curr;
         
-        /* Checks for syntax errors. */
+        /* Checks for syntax errors and sets precedent conditions. 
+         * See spec for details and conventions. */
         switch(curr) {
         case ';':
-          break;
         case '|':
-          break;
         case '&':
+          if(prevprevChar == ';' || prevprevChar == '\n' || prevprevChar == '\0')
+          {
+            free(arrayOfTokens);
+            error(1, 0, "%i: Syntax Error - Misusage of ; or | or || or &&.", line);
+          }
           break;
         case '(':
+          parentheses++;
           break;
         case ')':
+          parentheses--;
           break;
         case '<':
-          break;
         case '>':
+          if(prevChar == '<' || prevChar == '>' || prevChar == '\0')
+          {  
+            free(arrayOfTokens);
+            error(1, 0, "%i: Syntax Error - Misusage of > or <.", line);
+          }
+          break;
+        case '\n':
+          if(prevChar == '<' || prevChar == '>')
+          {
+            free(arrayOfTokens);
+            error(1, 0, "%i: Syntax Error - Misusage of > or <.", line);
+          }
+          if(getGrammar(prevChar) == WORD || prevChar == ')')
+          {
+            arrayOfTokens[0] = ';';
+          }
+          else 
+          {
+            stop = true;
+          }
           break;
         }
 
+        /* Moves in placement in stream after TOKEN. */
         prevChar = curr;
-        prevToken = prevChar;
+        prevprevChar = prevChar;
         curr = get_next_byte(get_next_byte_argument);
 
         /* Checks && and || syntax. */
         switch(prevChar) {
         case '|':
           if(curr != '|')
-            //error(1, 0, "%u: Syntax Error: Missing |", line);
+            //error(1, 0, "%i: Syntax Error: Missing |", line);
             pipeline = true;
           break;
         case '&':
           if(curr != '&')
           {
             free(arrayOfTokens);
-            error(1, 0, "%u: Syntax Error: Missing &", line);
+            error(1, 0, "%i: Syntax Error: Missing &", line);
           }
           break;
         }  
       }  
       else if(getGrammar(curr) == OTHER)
       {
+        /* Syntax not used in this shell. */
         free(arrayOfTokens);
-        error(1, 0, "%u: Syntax Error- Not WORD OR TOKEN OR SPACE", line);
+        error(1, 0, "%i: Syntax Error- Not WORD OR TOKEN OR SPACE", line);
       }
       else
+      {
         /* Add WORD to array of tokens. */
         while(getGrammar(curr) == WORD)
         {
           /* Check if there is enough space and reallocate if needed. */
-          if(((strlen(arrayOfTokens) * sizeof(char) + 1) + (sizeof(char) + 1) < sizeof(arrayOfTokens))
+          if(((strlen(arrayOfTokens) * char_size + 1) + (char_size + 1)) < sizeof(arrayOfTokens))
           {
-            arrayOfTokens = checked_grow_alloc(arrayOfTokens, sizeof(char))
+            arrayOfTokens = checked_grow_alloc(arrayOfTokens, &char_size);
           }
           
-          strncat(arrayOfTokens, curr);
-          strncat(arrayOfTokens, '\0');
+          /* Concatenate current char and end of C-String to end of array.
+           * NOTE: strcat doesn't allow concatenating nulls. */   
+          size_t end = strlen(arrayOfTokens);
+          arrayOfTokens[end] = curr + '\0';
+
+          /* Move placement in stream to collect WORD. */
+          prevChar = curr;
+          prevprevChar = prevChar;
+          curr = get_next_byte(get_next_byte_argument);   
         }
+      }
+      
+      /* Check if there is enough space and reallocate if needed. */
+      size_t char_ptr_size = sizeof(char*);
+      curr_stream->str_token = checked_grow_alloc(curr_stream->str_token, &char_ptr_size);
+      
+      /* Put gathered tokens into command_stream_t array of C-Strings. */
+      if(stop == false)
+      {
+        curr_stream->str_token[curr_stream->num_token] = arrayOfTokens;
+        curr_stream->num_token++;
+      }
+      else if(arrayOfTokens != NULL)
+      {
+        free(arrayOfTokens);
+      }
     }
   }
-  return 0;
+  
+  if(parentheses != 0)
+  {
+    error(1, 0, "0: Syntax Error - Unmatched parentheses.");
+  }
+  return curr_stream;
 }
 
 command_t
@@ -185,4 +247,4 @@ int getGrammar(int c)
     return -1;
   else 
     return OTHER;
-} 
+}
