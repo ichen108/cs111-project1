@@ -8,7 +8,7 @@
 /* FIXME: You may need to add #include directives, macro definitions,
    static function definitions, etc.  */
 
-/* Added  alloc.h file for memory allocation. */
+/* Added alloc.h file for memory allocation. */
 #include "alloc.h"
 
 /* Added extra directives from standard library. */
@@ -17,34 +17,46 @@
 #include <string.h>
 #include <ctype.h>
 
-/* Added extra definitions.
- * Enumeration of Grammar Syntax (Types of Grammar). 
- * NOTE: BY DEFAULT, THE FIRST TYPE IS SET TO 0 AND INCREMENTS TILL END. */
-enum grammar
-{
-  WORD,		// 'a-z', 'A-Z', '0-9', '!', '%', '+', ',', '-', '.', '/', ':', '@', '^', '_'  
-  TOKEN,	// ';', '|', '&&', '||', '(', ')', '<', '>', ' '\n' '
-  SPACE,	// space or tab (new line is considered as ';')
-  OTHER,	// None of the above.
-};
-
 /* FIXME: Define the type 'struct command_stream' here.  This should
    complete the incomplete type declaration in command.h.  */
 
-/* Defined 'struct command_stream'. */ 
-struct command_stream
+/* Global Variables. */
+int line = 0;
+
+/* Defined 'struct command_stream'. */
+typedef struct command_stream
 {
-  int position;
-  char** str_token;
-  size_t num_token;
-  command_t* container;
-  command_t script;
+  void *stream;
+  int (*get_next_byte) (void*);
+  int has_char_waiting;
+  char ungotten_char;
 };
 
-/* Function declarations. */
-int getGrammar(int c);
-void free_memory(char* array, command_stream_t s);
-command_t parse(command_stream_t s, int start, int end, int *line, int *ferror);
+enum token_type 
+{
+  WORD,			// 'a-z', 'A-Z', '0-9', '!', '%', '+', ',', '-', '.', '/', ':', '@', '^', '_' 
+  NEWLINE,		// '\n'
+  SEMICOLON,		// ';'
+  PIPELINE,		// '|'
+  OR,			// '||'
+  AND,			// '&&'
+  OPEN_PARENTHESES,	// '('
+  CLOSED_PARENTHESES,	// ')'
+  REDIRECT_IN,		// '<'
+  REDIRECT_OUT,		// '>'
+  END_FILE,		// EOF
+
+  SPACE,		// space
+  SPECIAL_TOKEN,	// ';', '|', '&&', '||', '(', ')', '<', '>', ' '\n' '
+  UNSUPPORTED,		// unsupported token
+};
+
+typedef struct TOKEN
+{
+  enum token_type type;
+  char *token_name;
+} *token_t;
+
 
 command_stream_t
 make_command_stream (int (*get_next_byte) (void *),
@@ -54,185 +66,11 @@ make_command_stream (int (*get_next_byte) (void *),
      add auxiliary functions and otherwise modify the source code.
      You can also use external functions defined in the GNU C Library.  */
   //error (1, 0, "command reading not yet implemented");
-
-  /* Initialize curr_stream which is of type command_stream_t for the current stream processed. */
   command_stream_t curr_stream = checked_malloc(sizeof(struct command_stream));
-  curr_stream->position = 0;
-  curr_stream->str_token = checked_malloc(sizeof(char*));
-  curr_stream->num_token = 0;
-  curr_stream->script = NULL;
-  
-  int curr = 0;
-  int line = 0;
-  int ferror = 0;
-  int parentheses = 0;
-  
-  char prevChar = '\0';
-  char prevprevChar = '\0';
-
-  bool stop = false;
-  bool pipeline = false;
-
-  /* For loop reads stream and checks for syntax error. */
-  for(curr = get_next_byte(get_next_byte_argument); curr != EOF; )
-  {
-    char* arrayOfTokens;
-    size_t char_size = sizeof(char);
-
-    /* Checks for leading spaces and removes them from stream. */
-    while(getGrammar(curr) == SPACE)
-    {
-      prevChar = curr;
-      curr = get_next_byte(get_next_byte_argument);
-    }
-
-   /* Checks for valid comments and removes them from stream. */ 
-    if(curr == '#')
-    {
-      if(getGrammar(prevChar) == TOKEN || getGrammar(prevChar) == SPACE)
-      {
-        while(curr != '\n' && curr != EOF)
-        {
-          prevChar = curr;
-          curr = get_next_byte(get_next_byte_argument);
-        }
-      }
-      else
-      {
-         free_memory(arrayOfTokens, curr_stream);
-         error(1, 0, "%i: Syntax Error - Not a valid comment.", line);
-      }
-    }
-
-    /* Start storing if there is something to store from stream. */
-    if(curr != EOF)
-    {
-      arrayOfTokens = checked_malloc(char_size * 2);
-     
-      if(getGrammar(curr) == TOKEN)
-      {
-        arrayOfTokens[0] = curr;
-        
-        /* Checks for syntax errors and sets precedent conditions. 
-         * See spec for details and conventions. */
-        switch(curr) {
-        case ';':
-        case '|':
-        case '&':
-          if(prevprevChar == ';' || prevprevChar == '\n' || prevprevChar == '\0')
-          {
-            free_memory(arrayOfTokens, curr_stream);
-            error(1, 0, "%i: Syntax Error - Misusage of ; or | or || or &&.", line);
-          }
-          break;
-        case '(':
-          parentheses++;
-          break;
-        case ')':
-          parentheses--;
-          break;
-        case '<':
-        case '>':
-          if(prevChar == '<' || prevChar == '>' || prevChar == '\0')
-          {  
-            free_memory(arrayOfTokens, curr_stream);
-            error(1, 0, "%i: Syntax Error - Misusage of > or <.", line);
-          }
-          break;
-        case '\n':
-          if(prevChar == '<' || prevChar == '>')
-          {
-            free_memory(arrayOfTokens, curr_stream);
-            error(1, 0, "%i: Syntax Error - Misusage of > or <.", line);
-          }
-          if(getGrammar(prevChar) == WORD || prevChar == ')')
-          {
-            arrayOfTokens[0] = ';';
-          }
-          else 
-          {
-            stop = true;
-          }
-          break;
-        }
-
-        /* Moves in placement in stream after TOKEN. */
-        prevChar = curr;
-        prevprevChar = prevChar;
-        curr = get_next_byte(get_next_byte_argument);
-
-        /* Checks && and || syntax. */
-        switch(prevChar) {
-        case '|':
-          if(curr != '|')
-            //error(1, 0, "%i: Syntax Error: Missing |", line);
-            pipeline = true;
-          break;
-        case '&':
-          if(curr != '&')
-          {
-            free_memory(arrayOfTokens, curr_stream);
-            error(1, 0, "%i: Syntax Error: Missing &", line);
-          }
-          break;
-        }  
-      }  
-      else if(getGrammar(curr) == OTHER)
-      {
-        /* Syntax not used in this shell. */
-        free_memory(arrayOfTokens, curr_stream);
-        error(1, 0, "%i: Syntax Error- Not WORD OR TOKEN OR SPACE", line);
-      }
-      else
-      {
-        /* Add WORD to array of tokens. */
-        while(getGrammar(curr) == WORD)
-        {
-          /* Check if there is enough space and reallocate if needed. */
-          if(((strlen(arrayOfTokens) * char_size + 1) + (char_size + 1)) < sizeof(arrayOfTokens))
-          {
-            arrayOfTokens = checked_grow_alloc(arrayOfTokens, &char_size);
-          }
-          
-          /* Concatenate current char and end of C-String to end of array.
-           * NOTE: strcat doesn't allow concatenating nulls. */   
-          size_t end = strlen(arrayOfTokens);
-          arrayOfTokens[end] = curr + '\0';
-
-          /* Move placement in stream to collect WORD. */
-          prevChar = curr;
-          prevprevChar = prevChar;
-          curr = get_next_byte(get_next_byte_argument);   
-        }
-      }
-      
-      /* Check if there is enough space and reallocate if needed. */
-      size_t char_ptr_size = sizeof(char*);
-      curr_stream->str_token = checked_grow_alloc(curr_stream->str_token, &char_ptr_size);
-      
-      /* Put gathered tokens into command_stream_t array of C-Strings. */
-      if(stop == false)
-      {
-        curr_stream->str_token[curr_stream->num_token] = arrayOfTokens;
-        curr_stream->num_token++;
-      }
-      else if(arrayOfTokens != NULL)
-      {
-        free(arrayOfTokens);
-      }
-    }
-  } 
-
-  /* Reports parentheses matching error. */
-  if(parentheses != 0)
-  {
-    error(1, 0, "0: Syntax Error - Unmatched parentheses.");
-  }
-
-  line++;
-
-  curr_stream->script = parse(curr_stream, 0, curr_stream->num_token - 1, &line, &ferror);
-  curr_stream->container = checked_malloc(sizeof(command_t*));
+  curr_stream->stream = get_next_byte_argument;
+  curr_stream->has_char_waiting = -1;
+  curr_stream->ungotten_char = '\0';
+ 
   return curr_stream;
 }
 
@@ -240,76 +78,227 @@ command_t
 read_command_stream (command_stream_t s)
 {
   /* FIXME: Replace this with your implementation too.  */
-  //error (1, 0, "command reading not yet implemented");
-  
-  /* Temporary addition to remove warning. */
-  printf("%i", s->position);
+  error (1, 0, "command reading not yet implemented");
   return 0;
 }
 
-/* Distinguish between grammar of syntax with enum.
- * Status: VERIFIED */
+/* Start implementation of PARSER */
+
+command_t
+parse_command_stream(token_stream_t s)
+{
+
+   //implementation goes here
+   /* 
+      Takes in a stream of token objects which contain token type and token name information
+      ***Need to convert the tokens to commands***
+      Attempt to build tree recursively and return the root node of the tree (a command object)
+      Tree is rebuilt through DFS
+
+      PSEUDOCODE:
+
+	command_t curr;
+	for(int i = 0; i < tokenstream.size; i++)	// iterate along COMPLETE commands
+	{
+		for (int j = 0; j < tokenstream[i].size; j++) // iterate within complete commands
+		{
+			
+   */
+
+   
+}
+
+
+
+/* Start implementation of TOKENIZER */
+
+/* Checks if there is a byte taken from get_next_byte() and uses it if available. */
+int get_check(command_stream_t s)
+{
+  if(s->has_char_waiting == -1)
+  {
+    return s->get_next_byte(s->stream);
+  }
+  else
+  {
+    int temp = s->has_char_waiting;
+    s->has_char_waiting = -1;
+    return temp;
+  }
+}
+
+/* Checks if there is a byte and returns it back into the stream due to overlooking. */
+int unget_check(command_stream_t s, int c)
+{
+  if(s->has_char_waiting != -1)
+  {
+    return 1;
+  }
+  else
+  {
+    s->has_char_waiting = c;
+    return 0;
+  }
+}
+
+/* Allocate memory for token. */
+token_t create_token(void)
+{
+  token_t new_token;
+  new_token = checked_malloc(sizeof(struct TOKEN));
+  new_token->type = 0;
+  new_token->token_name = NULL;
+  return new_token;
+}
+
+/* Fill this token with the appropriate information. */
+token_t fill_token(command_stream_t s, int c)
+{
+  token_t new_token = create_token();
+
+  switch(c) {
+    case ';':
+      new_token->type = SEMICOLON;
+      break;
+    case '|':
+      if(get_check(s) == '|')
+      {
+        new_token->type = OR;
+      }
+      else
+      {
+        unget_check(s, get_check(s));
+        new_token->type = PIPELINE;
+      }
+      break;
+    case '&':
+      if(get_check(s) == '&')
+      {
+        new_token->type = AND;
+      }
+      else
+      {
+        error(1, 0, "%d: Syntax Error - Misusage of &.\n", line);
+      }
+      break;
+    case '(':
+      new_token->type = OPEN_PARENTHESES;
+    case ')':
+      new_token->type = CLOSED_PARENTHESES;
+      break;
+    case '<':
+      new_token->type = REDIRECT_IN;
+      break;
+    case '>':
+      new_token->type = REDIRECT_OUT;
+      break;
+  }
+  return new_token;
+}
+
+/* Distinguish between grammar of syntax with enum. Return 0 for WORD and 1 for SPECIAL TOKEN. */
 int getGrammar(int c)
 {
   if((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || isdigit(c) || c == '!' || c == '%' || c == '+' || c == ',' || c == '-' || c == '.' || c == '/' || c == ':' || c == '@' || c == '^' || c == '_')
-    return WORD;
+    return 0;
   else if(c == ';' || c == '|' || c == '&' || c == '(' || c == ')' || c == '<' || c == '>' || c == '\n')
-    return TOKEN;
-  else if(isspace(c))
-    return SPACE;
-  else if(c == EOF)
-    return -1;
-  else 
-    return OTHER;
+    return 1;
+  else
+    error(1, 0, "%d: Syntax Error - Unsupported characters.", line);
 }
 
-/* Frees array containing token and command_stream. */
-void free_memory(char* array, command_stream_t s)
+int consume_whitespace(command_stream_t s)
 {
-  /* Free c-string. */
-  free(array);
- 
- /* Checks if there is something to remove in command_stream. */
-  if(s == NULL)
+  int curr;
+  int track_newline = 0;
+
+  while((curr = get_check(s) != EOF) && (isspace(curr)))
   {
-    error(1, 0, "0: Memory Error - Cannot free NULL");
+    if(curr == '\n')
+    {
+      line++;
+      track_newline = '\n';
+    }
   }
 
-  /* Free each token in array. */
-  size_t start = 0;
-  while(start < s->num_token)
+  if(curr == EOF)
   {
-    free(s->str_token[start]);
-    start++;
+    return EOF;
   }
 
-  /* Free pointer to this memory. */
-  free(s->str_token);
- 
-  /* Checks if there is something of command_t and removes it. */
-  if(s->container != NULL)
+  if(curr == '#')
   {
-    free(s->container);
+    while(((curr = get_check(s)) != '\n') && (curr != EOF))
+    {
+      line++;
+      return '\n';
+    }
   }
+  //else
+  //{
+  //    error(1, 0, "%d: Syntax Error - Not a valid comment.", line);
+  //}
 
-  /* Completely free command_stream. */
-  free(s);
+  unget_check(s, curr);
+  return track_newline;
 }
 
-command_t parse(command_stream_t s, int start, int end, int *line, int *ferror)
+token_t get_next_token(command_stream_t s)
 {
-  /* Initalization of return command. */
-  command_t ret_command;
-  ret_command = checked_malloc(sizeof(struct command));
-  ret_command->type = -1;
-  ret_command->status = -1;
-  ret_command->input = 0;
-  ret_command->output = 0;
+  char* word_array;
+  char* temp;
+  size_t size = 0;
 
-  int pos = end;
-
-  while(end > start && ((strcmp(s->str_token[end], "\n")) == 0 || strcmp(s->str_token[end], ";") == 0))
+  int curr = consume_whitespace(s);
+ 
+  if(curr == '\n')
   {
-      end--;
+    token_t new_token = create_token();
+    new_token->type = NEWLINE;
   }
+  
+  if(curr == EOF)
+  {
+    token_t new_token = create_token();
+    new_token->type = END_FILE;
+  }
+
+  curr = get_check(s);
+  if(getGrammar(curr))
+  {
+    return fill_token(s, curr);
+  }
+
+  token_t new_token = create_token();
+  new_token->type = WORD;
+
+  word_array = checked_malloc(sizeof(char) * 5);
+  *(temp++) = curr;
+  size++;
+  
+  for(;;)
+  {
+    curr = get_check(s);
+    
+    if(curr == EOF || isspace(curr) || getGrammar(curr))
+    {
+      if(curr != EOF)
+      {
+        unget_check(s, curr);
+      }
+      *temp = '\0';
+      new_token->token_name = word_array;
+      return new_token;
+    }
+    
+    *(temp++) == curr;
+    size++;
+
+    if((size % 5) == 0) 
+    {
+      word_array = checked_realloc(word_array, size+5);
+    }
+  }
+  
+  return new_token;
 }
