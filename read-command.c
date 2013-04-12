@@ -91,6 +91,9 @@ read_command_stream (command_stream_t s)
  ******* Start of TOKENIZER Implementation *******
  *************************************************
  *************************************************/
+ 
+ /* Function declaration */
+token_t get_next_token(command_stream_t s);
 
 /* Checks if there is a byte taken from a previous call and uses it before moving on. */
 int get(command_stream_t s)
