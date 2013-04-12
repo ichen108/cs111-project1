@@ -25,7 +25,7 @@ Extra Notes by Calvin:
       }
       
       token_t get_next_token(cstream_t name) {
-          // First, consume the whitespace by calling consume_white
+          // First, consume the whitespace by calling remove_white
           // Next, read the next character. If it's for a special token, call a handle_reserved(name,letter)
           //    function which reads until the next non-special letter.
           // Otherwise just read characters until you reach a special letter or whitespace and create a token
