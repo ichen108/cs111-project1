@@ -27,7 +27,7 @@ struct command
     // for AND_COMMAND, SEQUENCE_COMMAND, OR_COMMAND, PIPE_COMMAND:
     struct command *command[2];
 
-    // for SIMPLE_COMMAND:
+    // for SIMPLE_COMMAND (and redirects):
     char **word;
 
     // for SUBSHELL_COMMAND:

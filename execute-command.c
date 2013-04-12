@@ -25,5 +25,7 @@ execute_command (command_t c, bool time_travel)
      You can also use external functions defined in the GNU C Library.  */
   error (1, 0, "command execution not yet implemented");
   time_travel = false;
+  if(time_travel)
+     printf("%s","");
   printf("Type: %i\n", c->type);
 }

@@ -1,4 +1,39 @@
-This is a skeleton for CS 111 Lab 1.
+Group Members:
+Calvin Cam 803781760
 
-Replace this README file with notes on your implementation.
-Mentions any special features or limitations.
+Ian Chen 203764136
+
+Implementation:
+- Tokenizer by Calvin
+
+
+Extra Notes by Calvin:
+- Originally I wrote a make_command_stream to read in the script and check for syntax errors before starting. 
+  Once it generates a command_stream of the script, it will parse through this command and create the tree by
+  finding the most precedent operator. The left and right side are nodes which will be recursively parsed.
+  This will repeat till a stopping case. read_command_stream will pull from this created tree.
+- However, my friend suggest a smarter method which involves tokenizing and then parsing. This method would
+  remove all the error checking in the beginning so that you would only need to check a small command to fit
+  under a certain command type. He suggested to have the following implementation:
+
+      typedef struct TOKEN {
+          enum token_type type;
+          char *token_name;
+      } token_t;
+      
+      int remove_whitespace(cstream_t name) {
+          // Keep reading from name until a non-whitespace character is reached, then unget that character
+      }
+      
+      token_t get_next_token(cstream_t name) {
+          // First, consume the whitespace by calling remove_white
+          // Next, read the next character. If it's for a special token, call a handle_reserved(name,letter)
+          //    function which reads until the next non-special letter.
+          // Otherwise just read characters until you reach a special letter or whitespace and create a token
+          //     from those characters.
+      }
+
+- My tokenizer was centered around:
+  + http://stackoverflow.com/questions/1669/learning-to-write-a-compiler
+  + http://en.wikipedia.org/wiki/Lexing
+  + My friend's psuedocode shown above
