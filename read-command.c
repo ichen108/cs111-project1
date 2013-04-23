@@ -77,6 +77,10 @@ make_command_stream (int (*get_next_byte) (void *),
   return curr_stream;
 }
 
+
+
+// gets tokens, accounts for special cases, and reallocates memory for the token array
+// call parse on finish token array
 command_t
 read_command_stream (command_stream_t s)
 {
@@ -89,7 +93,12 @@ read_command_stream (command_stream_t s)
     token_t curr = get_token(s);
 
     if(curr->type == NEWLINE && prev && prev->type == WORD)
-      curr->type = SEMICOLON;
+	break;
+    else if(curr->type == NEWLINE && prev && prev->type == SEMICOLON)
+    {
+      tokArr = checked_realloc(tokArr, (size - 1) * sizeof(struct TOKEN));
+	break;
+    }
     else if (curr->type == NEWLINE)
       continue;
     if (curr->type == END_FILE && prev && prev->type == SEMICOLON) {
@@ -245,7 +254,8 @@ int getGrammar(int c)
   {
     return 0;
   }
-  else if(c == ';' || c == '|' || c == '&' || c == '(' || c == ')' || c == '<' || c == '>')
+  else if(c == ';' || c == '|' || c == '&' || c == '(' || c == ')' || c == '<' || c == '>' || c == '\n' || 
+	c == ' ' || c == '\t')
   {
     return 1;
   }
@@ -378,6 +388,8 @@ token_t get_next_token(command_stream_t s)
  *************************************************
  *************************************************/
 
+
+//takens in token and outputs appropriate command type
 enum command_type tokenToCommand(token_t input)
 {
    enum command_type curr;
@@ -402,6 +414,7 @@ enum command_type tokenToCommand(token_t input)
    
 } 
 
+// Recursive function for building tree
 command_t parse(token_t *toBeParsed, int len)
 {
    int i;
@@ -415,9 +428,9 @@ command_t parse(token_t *toBeParsed, int len)
    ret->output = 0;
    ret->status = 0;
 
-   for(i = 0; i < len; i++)
+   for(i = len - 1; i >= 0; i--)
    {
-	if(toBeParsed[i]->type == OPEN_PARENTHESES)
+	if(toBeParsed[i]->type == OPEN_PARENTHESES) // ensure we are not within subshells that we do not care about yet
 	   parStat++;
 	if(toBeParsed[i]->type == CLOSED_PARENTHESES)
 	   parStat--;
@@ -428,7 +441,7 @@ command_t parse(token_t *toBeParsed, int len)
 	if(parStat > 0)
 	   continue;
 
-	if(toBeParsed[i]->type == SEMICOLON)
+	if(toBeParsed[i]->type == SEMICOLON) // set the left and right for semicolon
 	{
 	   ret->u.command[0] = parse(toBeParsed, i);
 	   ret->u.command[1] = parse(toBeParsed + i + 1, len - i - 1);
@@ -440,7 +453,7 @@ command_t parse(token_t *toBeParsed, int len)
    if(parStat > 0)
 	 error(1, 0, "1: Error, mismatched parentheses");
 
-   for(i = 0; i < len; i++)
+   for(i = len - 1; i >= 0; i--)
    {
 	if(toBeParsed[i]->type == OPEN_PARENTHESES)
 	   parStat++;
@@ -450,7 +463,7 @@ command_t parse(token_t *toBeParsed, int len)
 	if(parStat > 0)
 	   continue;
 
-	if( (toBeParsed[i]->type == AND) || (toBeParsed[i]->type == OR) )
+	if( (toBeParsed[i]->type == AND) || (toBeParsed[i]->type == OR) ) //set left and right for And and Or 
 	{
 	   ret->u.command[0] = parse(toBeParsed, i);
 	   ret->u.command[1] = parse(toBeParsed + i + 1, len - i - 1);
@@ -459,7 +472,7 @@ command_t parse(token_t *toBeParsed, int len)
 	}
    }
 
-   for(i = 0; i < len; i++)
+   for(i = len - 1; i >= 0; i--)
    {
 	if(toBeParsed[i]->type == OPEN_PARENTHESES)
 	   parStat++;
@@ -469,7 +482,7 @@ command_t parse(token_t *toBeParsed, int len)
 	if(parStat > 0)
 	   continue;
 
-	if(toBeParsed[i]->type == PIPELINE)
+	if(toBeParsed[i]->type == PIPELINE) // set left and right for pipeline
 	{
 	   ret->u.command[0] = parse(toBeParsed, i);
 	   ret->u.command[1] = parse(toBeParsed + i + 1, len - i - 1);
@@ -501,7 +514,7 @@ command_t parse(token_t *toBeParsed, int len)
 	   i++;
 	} else if (toBeParsed[i]->type == REDIRECT_OUT && toBeParsed[i+1]->type != WORD)
 	   error(1,0,"1: Error, empty redirect");
-   }
+   }// fulfill fields for redirection operators
 
    if(toBeParsed[0]->type == OPEN_PARENTHESES)
    {
@@ -513,11 +526,11 @@ command_t parse(token_t *toBeParsed, int len)
 	ret->type = SUBSHELL_COMMAND;
 	ret->u.subshell_command = parse(toBeParsed + 1, i - 1);
    	return ret;
-   }
+   } // fill fields for subshell
 
    ret->u.word = checked_malloc(sizeof(char*)); 
    int size = 0;
-   for(i = 0; i < len; i++)
+   for(i = 0; i < len; i++) // fill out fields for simple commands
    {
 	if(toBeParsed[i]->type == OPEN_PARENTHESES)
 	   parStat++;
@@ -548,3 +561,9 @@ command_t parse(token_t *toBeParsed, int len)
 
    return ret;
 }
+
+/*************************************************
+ *************************************************
+ ********** End of Parser Implementation *********
+ *************************************************
+ *************************************************/

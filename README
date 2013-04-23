@@ -1,10 +1,11 @@
-Group Members:
+Group Member UIDs:
 Calvin Cam 803781760
 
 Ian Chen 203764136
 
 Implementation:
 - Tokenizer by Calvin
+- Parser by Ian
 
 
 Extra Notes by Calvin:
@@ -37,3 +38,13 @@ Extra Notes by Calvin:
   + http://stackoverflow.com/questions/1669/learning-to-write-a-compiler
   + http://en.wikipedia.org/wiki/Lexing
   + My friend's psuedocode shown above
+
+Notes by Ian:
+- The second part of project 1a involves taking token objects from the tokenizer and converting them into commands to
+  be stored in a tree. read_command_stream continues to take in tokens and store them in a dynamically allocated token 
+  array. We then call parse on this token array. 
+- The parse function reads in the token array and breaks it down by recursively calling parse on subsequently smaller 
+  pieces of the array. In this manner it is a little similar to mergesort. Depending on the type of command read from 
+  tokens, fields of the struct command are set and linked with other commands.
+- The parse function is not very efficient and may need some improvement with parts 1b and 1c for more effective 
+  parallelization
