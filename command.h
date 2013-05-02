@@ -13,7 +13,7 @@ command_stream_t make_command_stream (int (*getbyte) (void *), void *arg);
 
 /* Read a command from STREAM; return it, or NULL on EOF.  If there is
    an error, report the error and exit instead of returning.  */
-command_t read_command_stream (command_stream_t stream);
+command_t read_command_stream (command_stream_t);
 
 /* Print a command to stdout, for debugging.  */
 void print_command (command_t);
@@ -21,7 +21,7 @@ void print_command (command_t);
 /* Execute a command.  Use "time travel" if the flag is set.  */
 void execute_command (command_t, bool);
 
-void execute_t(command_stream_t stream);
+void execute_t(command_stream_t);
 
 /* Return the exit status of a command, which must have previously
    been executed.  Wait for the command, if it is not already finished.  */
