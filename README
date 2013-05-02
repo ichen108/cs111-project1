@@ -49,9 +49,21 @@ Notes by Ian:
 - The parse function is not very efficient and may need some improvement with parts 1b and 1c for more effective 
   parallelization
 
+
 1b Implementation:
-
-
+- We executed commands through an int function execute which takes in a command_t.
+- This function is called when time travel is false.
+- The function returns 1 when the command executes successfully and 0 if it failed.
+- Each command is implemented based on shell's definition.
+- Sequence runs the first command, then the second.
+- Pipe is more difficult to keep track of due to the multiple processes. To be safe, we killed processes and used wait 
+  to keep track of status.
+- And runs both commands.
+- Or runs one command and exits if it is successful else it would run the second.
+- Subshell requires opening files as shown in class.
+- Simple is similar to subshell except the "exec" command was interesting to implement.
+- Overall, 1b was good practice on forks and dups and processes in general. Hopefully we implemented everything required
+  for command execution.
 
 
 1c Implementation by Ian:
