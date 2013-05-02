@@ -383,8 +383,8 @@ dep_graph_t make_dep_graph(command_stream_t s)
 			n->outMem = OMem;
 			n->args = args;
 			
-			//if outputs is not empty and there is a node in the executable array
-			//of the graph, then add a dependency to the current node and then push it to the dependancy graph
+			// if outputs is not empty and executable array not empty
+			// of the graph, then add a dependency to the current node and then push it to dependancy graph
 			if(outputs != NULL && iter < ret->execSize)
 			{
 				while(position < OSize)
@@ -405,10 +405,8 @@ dep_graph_t make_dep_graph(command_stream_t s)
 				}
 			}
 			
-			//if there is a value in the output array and there is a node in the dependancy array
-			//of the graph, then add a dependency to the current node and then push it to the dependancy graph, because all commands
-			//are parsed sequentially, if a dependancy occurs in the dependancy graph, then it must be added to the
-			//dependancy graph
+			// if outputs not empty and dependency array not empty
+			// then add a dependency to the current node and then push it to the dependancy graph
 			if(outputs != NULL && iter < ret->depSize)
 			{
 				while(outputs[position]!=NULL)
@@ -426,8 +424,8 @@ dep_graph_t make_dep_graph(command_stream_t s)
 				}
 			}
 			
-			//if there is a input dependency and there is a matching value in the dependancy graph
-			//push the dependancy for this node
+			// if there is an input dependency and there is a matching value in the dependancy graph
+			// we need to push dependancy for this node
 			if(inputs != NULL && iter < ret->depSize)
 			{
 				while(inputs[position]!=NULL)
@@ -445,7 +443,7 @@ dep_graph_t make_dep_graph(command_stream_t s)
 				}
 			}
 			
-			//same thing as above, but check the executable array for a dependancy
+			// See above, but check executable array for a dependancy
 			if(inputs != NULL && iter < ret->execSize)
 			{
 				while(inputs[position]!=NULL)
@@ -463,8 +461,7 @@ dep_graph_t make_dep_graph(command_stream_t s)
 				}
 			}
 			
-			//this should do the same for the arguments parsed as command line and not strict 
-			//I/O redirection. This function checks the dependancy array of the graph
+			// checks args for dependency
 			if(args != NULL && iter < ret->depSize)
 			{
 				while(args[position]!=NULL)
@@ -482,7 +479,7 @@ dep_graph_t make_dep_graph(command_stream_t s)
 				}
 			}
 			
-			//same as above, but it checks the executable array for the graph
+			// See above but check executable array 
 			if(args != NULL && iter < ret->execSize)
 			{
 				while(args[position]!=NULL)
@@ -504,7 +501,7 @@ dep_graph_t make_dep_graph(command_stream_t s)
 			iter +=1;
 		}
 
-		//if at any point the bef_size of the current node has been altered so it is greater than 0, add this
+		//if at any point the bSize of the current node has been altered so it is greater than 0, add this
 		//node to the dependancy array for the graph
 		if(n->bSize > 0)
 			addToDep(ret, n, 1); 
@@ -559,21 +556,6 @@ void execute_dep_graph(dep_graph_t d)
 			execute_dep_graph(d);
 		}
 	}
-	
-	//TODO:
-	// while d has independent nodes
-		// remove a node n from d
-		// Fork
-		
-		// If child:
-		// execute n
-		//for each node m dependent on n
-		//	pop n from m's dependency array
-		//	if m's dependency array is empty
-		//		insert m into d.n_exec;
-	
-		// If parent:
-		//	recurse
 }
 
 int execute_recursive(command_t c)
@@ -604,12 +586,12 @@ int execute_recursive(command_t c)
 		if(waitpid(pid, &status, 0) < 0)
 		{
 			return status;
-			error(status, 0, "Child Process Failed");
+			// error(status, 0, "Child Process Failed");
 		}
 		if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
 		{
 			return status;
-			error(status, 0, "Child Process Failed");
+			// error(status, 0, "Child Process Failed");
 		}
 		
 		return 0;
@@ -672,12 +654,12 @@ int execute_recursive(command_t c)
 						if (waitpid(child1, &childstatus, 0)<0)
 						{
 							return childstatus;
-							error(childstatus, 0, "Child Process Failed");
+						//	error(childstatus, 0, "Child Process Failed");
 						}
 						if (!WIFEXITED(childstatus) || WEXITSTATUS(childstatus) != 0)
 						{
 							return childstatus;
-							error(childstatus, 0, "Child Process Failedsadsadsa");
+						//	error(childstatus, 0, "Child Process Failed");
 						}
 						waitpid(child2, &childstatus, WNOHANG);
 						exit(0);

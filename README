@@ -3,7 +3,7 @@ Calvin Cam 803781760
 
 Ian Chen 203764136
 
-Implementation:
+1a Implementation:
 - Tokenizer by Calvin
 - Parser by Ian
 
@@ -48,3 +48,16 @@ Notes by Ian:
   tokens, fields of the struct command are set and linked with other commands.
 - The parse function is not very efficient and may need some improvement with parts 1b and 1c for more effective 
   parallelization
+
+1b Implementation:
+
+
+
+
+1c Implementation by Ian:
+- We implement by creating a graph struct containing pointers to two graph arrays. These arrays are for 
+  dependencies and executables. After processing the commands from command_stream passed in main, the dependency graph
+  is set up and executed.
+- Timetravel param is passed into main and from there, determines which execution function to call (either basic execute or 
+  special parallelization execute)
+- 
